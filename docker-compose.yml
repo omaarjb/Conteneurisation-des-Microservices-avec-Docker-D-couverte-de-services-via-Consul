@@ -1,0 +1,103 @@
+name: tp25
+
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3307:3306"
+    networks:
+      - microservices-network
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -proot || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  consul:
+    image: consul:1.15.4
+    command: consul agent -dev -ui -client=0.0.0.0
+    ports:
+      - "8500:8500"
+    networks:
+      - microservices-network
+
+  gateway-service:
+    build:
+      context: ./gateway
+    ports:
+      - "8888:8080"
+    networks:
+      - microservices-network
+    depends_on:
+      mysql:
+        condition: service_healthy
+      consul:
+        condition: service_started
+    environment:
+      SPRING_CLOUD_CONSUL_HOST: consul
+      SPRING_CLOUD_CONSUL_PORT: 8500
+      SPRING_CLOUD_CONSUL_DISCOVERY_ENABLED: "true"
+
+  client-service:
+    build:
+      context: ./client
+    ports:
+      - "8088:8080"
+    networks:
+      - microservices-network
+    depends_on:
+      mysql:
+        condition: service_healthy
+      consul:
+        condition: service_started
+      gateway-service:
+        condition: service_started
+    environment:
+      SPRING_CLOUD_CONSUL_HOST: consul
+      SPRING_CLOUD_CONSUL_PORT: 8500
+      SPRING_CLOUD_CONSUL_DISCOVERY_ENABLED: "true"
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/Micro_ClientDB?createDatabaseIfNotExist=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+
+  voiture-service:
+    build:
+      context: ./car
+    ports:
+      - "8089:8080"
+    networks:
+      - microservices-network
+    depends_on:
+      mysql:
+        condition: service_healthy
+      consul:
+        condition: service_started
+      gateway-service:
+        condition: service_started
+    environment:
+      SPRING_CLOUD_CONSUL_HOST: consul
+      SPRING_CLOUD_CONSUL_PORT: 8500
+      SPRING_CLOUD_CONSUL_DISCOVERY_ENABLED: "true"
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/Micro_VoitureDB?createDatabaseIfNotExist=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:5.2.3
+    ports:
+      - "8081:80"
+    networks:
+      - microservices-network
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      MYSQL_ROOT_PASSWORD: root
+
+networks:
+  microservices-network:
+    driver: bridge

@@ -1,0 +1,12 @@
+spring:
+  application:
+    name: SERVICE-CLIENT
+  jpa:
+    hibernate:
+      ddl-auto: create
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
